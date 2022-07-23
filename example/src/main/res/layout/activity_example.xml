@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <EditText
+        android:id="@+id/id_extras"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:hint="Id"/>
+
+    <EditText
+        android:id="@+id/name_extras"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:hint="name"/>
+
+    <Button
+        android:id="@+id/next"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Next"/>
+
+    <Button
+        android:id="@+id/result"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Result"/>
+</androidx.appcompat.widget.LinearLayoutCompat>
