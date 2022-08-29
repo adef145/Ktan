@@ -30,6 +30,11 @@ Ktan make your intent / arguments more easier and readable. And most important, 
       id 'com.google.devtools.ksp'
    }
    
+   ksp {
+      // put this arg to turn on LiveData for all extra
+      arg("com.ktan.processor.LIVE_DATA", "true")
+   }
+   
    android {
       buildTypes {
          release {
@@ -59,6 +64,12 @@ Ktan make your intent / arguments more easier and readable. And most important, 
         
         // Optional: Parceler integration implementation
         implementation "com.github.adef145.Ktan:ktan-parceler:$latest_version"
+   
+        // Optional: LiveData integration implementation
+        implementation("com.github.adef145.Ktan:ktan-livedata:$latest_version") {
+            // put this line in case your targetSdkVersion below 32
+            exclude group: 'androidx.appcompat'
+        }
    }  
    ```  
    For more detail about ksp, you can read in [here](https://kotlinlang.org/docs/ksp-overview.html)
@@ -97,6 +108,11 @@ Ktan make your intent / arguments more easier and readable. And most important, 
         
         // define extra without default value and nullable 
         val name = StringExtra("name_extra")
+   
+        @Mutable // to define MutableLiveData instead of LiveData
+        @Required // to define this extra is required and non null when observe
+        @LiveExtra // to define this extra as LiveData when Binding 
+        val nameLive = StringExtra("name_live_extra")
    }  
    ```  
    
@@ -112,6 +128,11 @@ Ktan make your intent / arguments more easier and readable. And most important, 
         
         // define extra without default value and nullable 
         public StringExtra name = StringExtra("name_extra");
+   
+        @Mutable // to define MutableLiveData instead of LiveData
+        @Required // to define this extra is required and non null when observe
+        @LiveExtra // to define this extra as LiveData when Binding
+        public StringExtra nameLive = StringExtra("name_extra");
    }  
    ```  
    With this class, ksp processor will create one file with name `YourActivityExtrasKtan`.
@@ -122,6 +143,7 @@ Ktan make your intent / arguments more easier and readable. And most important, 
         
         var id: Int by requiredExtraOf(extras.id)
         val name: String? by extraOf(extas.name) // by default all extra is nullable if not annotated with Required
+        val nameLive: MutableLiveData<String> by mutableLiveExtraOf(extas.name)
         
    }
    
@@ -129,6 +151,7 @@ Ktan make your intent / arguments more easier and readable. And most important, 
    
         var id: Int by requiredExtraOf(extras.id)
         var name: String? by extraOf(extas.name)
+        var nameLive: String by extraOf(extas.nameLive)
    
         init {
             block.invoke(this)
@@ -209,12 +232,14 @@ Ktan make your intent / arguments more easier and readable. And most important, 
                Intent(context, YourActivity::class).populateYourActivityExtras {
                   id = 1
                   name = "Set your name here"
+                  nameLive = "Set your nameLive here"
                }
             }
             // or you can use extention function that created from @Route annotation
             startActivity(routeToYourActivity {
                id = 1
                name = "Set your name here"   
+               nameLive = "Set your name live here"
             })
         }  
    ```  
@@ -229,6 +254,7 @@ Ktan make your intent / arguments more easier and readable. And most important, 
                   .populateYourActivityExtras(new Intent(context, YourActivity.class), router -> {
                      router.setId(1);
                      router.setName("Set your name here");
+                     router.setNameLive("Set your name live here");
                      return Unit.INSTANCE;
                   })
             ); 
@@ -236,6 +262,7 @@ Ktan make your intent / arguments more easier and readable. And most important, 
             startActivity(YourActivityRouteKt.routeToYourActivity(router -> {
                router.setId(1);
                router.setName("Set your name here");
+               router.setNameLive("Set your name live here");
                return Unit.INSTANCE;
             }));
         }
