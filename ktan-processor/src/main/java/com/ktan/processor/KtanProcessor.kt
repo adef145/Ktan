@@ -7,6 +7,7 @@ import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
 import com.google.devtools.ksp.visitor.KSValidateVisitor
+import com.happyfresh.ktan.livedata.annotations.LiveExtra
 import com.ktan.annotations.Extras
 import com.ktan.annotations.Mutable
 import com.ktan.annotations.Required
@@ -15,9 +16,18 @@ import java.io.OutputStream
 
 class KtanProcessor(environment: SymbolProcessorEnvironment) : SymbolProcessor {
 
+    companion object {
+
+        private const val OPTIONS_PREFIX = "com.ktan.processor"
+
+        private const val OPTIONS_LIVE_DATA = "$OPTIONS_PREFIX.LIVE_DATA"
+    }
+
     private val logger = environment.logger
 
     private val codeGenerator = environment.codeGenerator
+
+    private val options = environment.options
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         logger.info("Start Ktan Processor")
@@ -41,14 +51,24 @@ class KtanProcessor(environment: SymbolProcessorEnvironment) : SymbolProcessor {
             })
 
         extrasSymbolsToProcess
-            .forEach { it.accept(ExtrasKClassVisitor(dependencies), Unit) }
+            .forEach {
+                it.accept(
+                    ExtrasKClassVisitor(
+                        dependencies,
+                        options[OPTIONS_LIVE_DATA]?.equals("true") == true
+                    ), Unit
+                )
+            }
         routeSymbolsToProcess
             .forEach { it.accept(RouteKClassVisitor(dependencies), Unit) }
 
         return unableToProcess.toList()
     }
 
-    private inner class ExtrasKClassVisitor(val dependencies: Dependencies) : KSVisitorVoid() {
+    private inner class ExtrasKClassVisitor(
+        val dependencies: Dependencies,
+        val liveDataOption: Boolean
+    ) : KSVisitorVoid() {
 
         override fun visitClassDeclaration(
             classDeclaration:
@@ -73,33 +93,89 @@ class KtanProcessor(environment: SymbolProcessorEnvironment) : SymbolProcessor {
             val bindingProperties = StringBuilder()
             val routerProperties = StringBuilder()
             val fileNameGenerated = "${className}Ktan"
+            val importDependencies = StringBuilder(
+                """
+                |import android.content.Context
+                |import android.content.Intent
+                |import android.os.Bundle
+                |import com.ktan.extraOf
+                |import com.ktan.requiredExtraOf
+                |import com.ktan.binding.ExtrasBinding
+                |import com.ktan.router.KtanRouter
+                """.trimMargin()
+            )
 
             logger.info("package $classPackage", classDeclaration)
 
+            var hasImportLiveExtraExt = false
+
             properties.filter { it.validate() }.forEach {
                 var declaringProperty = "val"
-                var delegatedProperty = "extraOf(extras.${it.simpleName.getShortName()})"
+                var delegatedPropertyBinding = "extraOf(extras.${it.simpleName.getShortName()})"
+                var delegatedPropertyRouter = "extraOf(extras.${it.simpleName.getShortName()})"
+                val isMutable = it.annotations.isAnnotationPresent(Mutable::class.java.simpleName)
+                val isRequired = it.annotations.isAnnotationPresent(Required::class.java.simpleName)
+                val isLiveExtra =
+                    liveDataOption || it.annotations.isAnnotationPresent(LiveExtra::class.java.simpleName)
 
                 logger.info(
                     "${it.simpleName.getShortName()} found in $className with type ${it.type}"
                 )
 
-                if (it.annotations.isAnnotationPresent(Mutable::class.java.simpleName)) {
-                    declaringProperty = "var"
+                if (isLiveExtra && !hasImportLiveExtraExt) {
+                    importDependencies.append(
+                        """
+                        |
+                        |import com.ktan.livedata.liveExtraOf
+                        |import com.ktan.livedata.mutableLiveExtraOf
+                        |import com.ktan.livedata.requiredLiveExtraOf
+                        |import com.ktan.livedata.requiredMutableLiveExtraOf
+                        """.trimMargin()
+                    )
+                    hasImportLiveExtraExt = true
                 }
-                if (it.annotations.isAnnotationPresent(Required::class.java.simpleName)) {
-                    delegatedProperty = "requiredExtraOf(extras.${it.simpleName.getShortName()})"
+
+                if (isLiveExtra) {
+                    delegatedPropertyBinding = "live${
+                        delegatedPropertyBinding.replaceFirstChar { first ->
+                            first.uppercase()
+                        }
+                    }"
+                }
+
+                if (isMutable) {
+                    if (isLiveExtra) {
+                        delegatedPropertyBinding = "mutable${
+                            delegatedPropertyBinding.replaceFirstChar { first ->
+                                first.uppercase()
+                            }
+                        }"
+                    } else {
+                        declaringProperty = "var"
+                    }
+                }
+                if (isRequired) {
+                    delegatedPropertyRouter = "required${
+                        delegatedPropertyRouter.replaceFirstChar { first ->
+                            first.uppercase()
+                        }
+                    }"
+                    delegatedPropertyBinding = "required${
+                        delegatedPropertyBinding.replaceFirstChar { first ->
+                            first.uppercase()
+                        }
+                    }"
                 }
 
                 bindingProperties.append(
                     """
-                    |$declaringProperty ${it.simpleName.getShortName()} by $delegatedProperty
+                    |$declaringProperty ${it.simpleName.getShortName()} by $delegatedPropertyBinding
                     |   
                     """.trimMargin()
                 )
                 routerProperties.append(
                     """
-                    |var ${it.simpleName.getShortName()} by $delegatedProperty
+                    |var ${it.simpleName.getShortName()} by $delegatedPropertyRouter
                     |   
                     """.trimMargin()
                 )
@@ -115,13 +191,7 @@ class KtanProcessor(environment: SymbolProcessorEnvironment) : SymbolProcessor {
                 """
                 |package $packageName
                 |
-                |import android.content.Context
-                |import android.content.Intent
-                |import android.os.Bundle
-                |import com.ktan.extraOf
-                |import com.ktan.requiredExtraOf
-                |import com.ktan.binding.ExtrasBinding
-                |import com.ktan.router.KtanRouter
+                |$importDependencies
                 |
                 |class ${className}Binding(extras: $className = $className()) : ExtrasBinding() {
                 |

@@ -7,11 +7,12 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.widget.doOnTextChanged
+import com.happyfresh.ktan.livedata.annotations.LiveExtra
 import com.ktan.annotations.Extras
 import com.ktan.annotations.Mutable
 import com.ktan.annotations.Required
 import com.ktan.annotations.Route
-import com.ktan.example.*
 import com.ktan.binding.bindExtras
 import com.ktan.extra.IntExtra
 import com.ktan.extra.StringExtra
@@ -56,6 +57,13 @@ open class ExampleActivity : AppCompatActivity(R.layout.activity_example) {
 
         initId(idEditText)
         nameEditText.setText(extrasBinding.store?.name)
+        nameEditText.doOnTextChanged { text, _, _, _ ->
+            extrasBinding.nameLive.postValue(text?.toString())
+        }
+
+        extrasBinding.nameLive.observe(this) {
+            Toast.makeText(this, "$it", Toast.LENGTH_SHORT).show()
+        }
     }
 
     fun initId(editText: EditText) {
@@ -82,6 +90,10 @@ class ExampleExtras {
 
     // Example parceler extra
     val store = ParcelerExtra<Store>("store")
+
+    @Mutable
+    @LiveExtra
+    val nameLive = name
 }
 
 @Extras

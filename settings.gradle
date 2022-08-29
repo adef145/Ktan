@@ -11,7 +11,7 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         mavenLocal()
-        maven { url 'https://jitpack.io' }
+//        maven { url 'https://jitpack.io' }
     }
 }
 rootProject.name = "Ktan"
@@ -22,3 +22,5 @@ include ':ktan'
 include ':ktan-parceler'
 include ':ktan-annotations'
 include ':ktan-processor'
+include ':ktan-livedata'
+include ':ktan-livedata-annotations'
