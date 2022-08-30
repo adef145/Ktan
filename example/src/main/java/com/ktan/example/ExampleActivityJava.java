@@ -80,7 +80,14 @@ public class ExampleActivityJava extends AppCompatActivity {
             @Override
             public void afterTextChanged(Editable editable) {
                 extrasBinding.setName(editable.toString());
+                extrasBinding.getNameLive().postValue(editable.toString());
             }
+        });
+        extrasBinding.getNameLive().observe(this, name -> {
+            if (name == null) {
+                return;
+            }
+            Toast.makeText(this, name, Toast.LENGTH_SHORT).show();
         });
     }
 

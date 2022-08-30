@@ -1,5 +1,6 @@
 package com.ktan.example;
 
+import com.happyfresh.ktan.livedata.annotations.LiveExtra;
 import com.ktan.annotations.Extras;
 import com.ktan.annotations.Mutable;
 import com.ktan.annotations.Required;
@@ -20,4 +21,8 @@ final public class ExampleJavaExtras {
 
     // Example parceler extra
     public final ParcelerExtra<Store> store = new ParcelerExtra<>("store");
+
+    @Mutable
+    @LiveExtra
+    public final StringExtra nameLive = name;
 }
