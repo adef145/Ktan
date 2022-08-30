@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1
+### Release Highlights
+Having `LiveData` integration for getting extras data.
+
+### Features
+* Annotation `@LiveExtra`. To help processor to generate `LiveData` data type on `Binding` class. And also can combine with another annotation likes:
+  * Annotation `@Required`. To define non null when receive the data from observe.
+  * Annotation `@Mutable`. To define as `MutableLiveData` instead of `LiveData`.
+
 ## 1.0
 ### Release Highlights
 This initial version, we try to make easier and simpler to get and put intent extras / arguments.
