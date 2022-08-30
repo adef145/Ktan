@@ -56,7 +56,7 @@ Ktan make your intent / arguments more easier and readable. And most important, 
       }
    }
    
-   def latest_version = "1.0"
+   def latest_version = "1.1"
    dependencies {  
         // Ktan implementation
         implementation "com.github.adef145.Ktan:ktan:$latest_version"
