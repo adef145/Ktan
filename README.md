@@ -1,4 +1,6 @@
 # Ktan
+[![](https://jitpack.io/v/adef145/Ktan.svg)](https://jitpack.io/#adef145/Ktan)
+![GitHub](https://img.shields.io/github/license/adef145/Ktan)
 
 Ktan make your intent / arguments more easier and readable. And most important, will help you bind  all extras for your activity / fragment. And also support for java :heart:.
 
@@ -56,7 +58,6 @@ Ktan make your intent / arguments more easier and readable. And most important, 
       }
    }
    
-   def latest_version = "1.1"
    dependencies {  
         // Ktan implementation
         implementation "com.github.adef145.Ktan:ktan:$latest_version"
