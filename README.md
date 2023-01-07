@@ -71,6 +71,9 @@ Ktan make your intent / arguments more easier and readable. And most important, 
             // put this line in case your targetSdkVersion below 32
             exclude group: 'androidx.appcompat'
         }
+
+        // Optional: Flow integration implementation
+        implementation("com.github.adef145.Ktan:ktan-flow:$latest_version")
    }  
    ```  
    For more detail about ksp, you can read in [here](https://kotlinlang.org/docs/ksp-overview.html)
@@ -114,6 +117,12 @@ Ktan make your intent / arguments more easier and readable. And most important, 
         @Required // to define this extra is required and non null when observe
         @LiveExtra // to define this extra as LiveData when Binding 
         val nameLive = StringExtra("name_live_extra")
+
+        // All flow will be map to StateFlow or MutableStateFlow
+        @Mutable // to define MutableStateFlow instead of StateFlow
+        @Required // to define this extra is required and non null when observe
+        @FlowExtra // to define this extra as StateFlow when Binding 
+        val nameFlow = StringExtra("name_flow_extra")
    }  
    ```  
    
@@ -145,6 +154,7 @@ Ktan make your intent / arguments more easier and readable. And most important, 
         var id: Int by requiredExtraOf(extras.id)
         val name: String? by extraOf(extas.name) // by default all extra is nullable if not annotated with Required
         val nameLive: MutableLiveData<String> by mutableLiveExtraOf(extas.name)
+        val nameFlow: MutableStateFlow<String> by mutableFlowExtraOf(extas.name)
         
    }
    
@@ -153,6 +163,7 @@ Ktan make your intent / arguments more easier and readable. And most important, 
         var id: Int by requiredExtraOf(extras.id)
         var name: String? by extraOf(extas.name)
         var nameLive: String by extraOf(extas.nameLive)
+        var nameFlow: String by extraOf(extas.nameFlow)
    
         init {
             block.invoke(this)
@@ -234,6 +245,7 @@ Ktan make your intent / arguments more easier and readable. And most important, 
                   id = 1
                   name = "Set your name here"
                   nameLive = "Set your nameLive here"
+                  nameFlow = "Set your nameFlow here"
                }
             }
             // or you can use extention function that created from @Route annotation
@@ -241,6 +253,7 @@ Ktan make your intent / arguments more easier and readable. And most important, 
                id = 1
                name = "Set your name here"   
                nameLive = "Set your name live here"
+               nameFlow = "Set your name flow here"
             })
         }  
    ```  

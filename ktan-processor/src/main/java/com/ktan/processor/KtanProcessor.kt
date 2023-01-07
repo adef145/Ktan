@@ -1,17 +1,29 @@
 package com.ktan.processor
 
-import com.google.devtools.ksp.*
+import com.google.devtools.ksp.getAllSuperTypes
+import com.google.devtools.ksp.getDeclaredProperties
+import com.google.devtools.ksp.isAbstract
+import com.google.devtools.ksp.isOpen
 import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
-import com.google.devtools.ksp.symbol.*
+import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSAnnotation
+import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSNode
+import com.google.devtools.ksp.symbol.KSType
+import com.google.devtools.ksp.symbol.KSTypeReference
+import com.google.devtools.ksp.symbol.KSValueParameter
+import com.google.devtools.ksp.symbol.KSVisitorVoid
+import com.google.devtools.ksp.validate
 import com.google.devtools.ksp.visitor.KSValidateVisitor
 import com.happyfresh.ktan.livedata.annotations.LiveExtra
 import com.ktan.annotations.Extras
 import com.ktan.annotations.Mutable
 import com.ktan.annotations.Required
 import com.ktan.annotations.Route
+import com.ktan.flow.annotations.FlowExtra
 import java.io.OutputStream
 
 class KtanProcessor(environment: SymbolProcessorEnvironment) : SymbolProcessor {
@@ -108,6 +120,7 @@ class KtanProcessor(environment: SymbolProcessorEnvironment) : SymbolProcessor {
             logger.info("package $classPackage", classDeclaration)
 
             var hasImportLiveExtraExt = false
+            var hasImportFlowExtraExt = false
 
             properties.filter { it.validate() }.forEach {
                 var declaringProperty = "val"
@@ -117,6 +130,8 @@ class KtanProcessor(environment: SymbolProcessorEnvironment) : SymbolProcessor {
                 val isRequired = it.annotations.isAnnotationPresent(Required::class.java.simpleName)
                 val isLiveExtra =
                     liveDataOption || it.annotations.isAnnotationPresent(LiveExtra::class.java.simpleName)
+                val isFlowExtra =
+                    !liveDataOption && it.annotations.isAnnotationPresent(FlowExtra::class.java.simpleName)
 
                 logger.info(
                     "${it.simpleName.getShortName()} found in $className with type ${it.type}"
@@ -135,6 +150,19 @@ class KtanProcessor(environment: SymbolProcessorEnvironment) : SymbolProcessor {
                     hasImportLiveExtraExt = true
                 }
 
+                if (isFlowExtra && !hasImportFlowExtraExt) {
+                    importDependencies.append(
+                        """
+                        |
+                        |import com.ktan.flow.flowExtraOf
+                        |import com.ktan.flow.mutableFlowExtraOf
+                        |import com.ktan.flow.requiredFlowExtraOf
+                        |import com.ktan.flow.requiredMutableFlowExtraOf
+                        """.trimMargin()
+                    )
+                    hasImportFlowExtraExt = true
+                }
+
                 if (isLiveExtra) {
                     delegatedPropertyBinding = "live${
                         delegatedPropertyBinding.replaceFirstChar { first ->
@@ -143,8 +171,16 @@ class KtanProcessor(environment: SymbolProcessorEnvironment) : SymbolProcessor {
                     }"
                 }
 
+                if (isFlowExtra) {
+                    delegatedPropertyBinding = "flow${
+                        delegatedPropertyBinding.replaceFirstChar { first ->
+                            first.uppercase()
+                        }
+                    }"
+                }
+
                 if (isMutable) {
-                    if (isLiveExtra) {
+                    if (isLiveExtra || isFlowExtra) {
                         delegatedPropertyBinding = "mutable${
                             delegatedPropertyBinding.replaceFirstChar { first ->
                                 first.uppercase()
