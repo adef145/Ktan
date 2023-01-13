@@ -12,6 +12,6 @@ task clean(type: Delete) {
 }
 
 allprojects {
-    group = project.findProperty("group") ?: "com.github.adef145.Ktan"
-    version = project.findProperty("version") ?: "1.0"
+    group = group == null || group == project.name ?: "com.github.adef145.Ktan"
+    version = version == "unspecified" ? "dev" : version
 }
