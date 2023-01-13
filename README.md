@@ -338,7 +338,7 @@ Ktan make your intent / arguments more easier and readable. And most important, 
    }
    ```
 
-Yap, that all how to use Ktan for your project. And no need handle for savedInstanceState,  because for mutable extra with `var` by default will handle your `onSavedInstanceState`
+Yap, that all how to use Ktan for your project. And no need handle for savedInstanceState,  because for mutable extra with `var` by default will handle your `onSavedInstanceState`.
 And also, will work for *Fragment*.
 
 ```markdown
