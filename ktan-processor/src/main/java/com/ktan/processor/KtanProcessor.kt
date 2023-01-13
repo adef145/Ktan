@@ -21,7 +21,7 @@ import com.ktan.processor.extensions.isFragmentPresent
 import com.ktan.processor.extensions.isMutablePresent
 import com.ktan.processor.extensions.isRequiredPresent
 import com.ktan.processor.integrations.flow.FlowPropertyAdapter
-import com.ktan.processor.integrations.live.LivePropertyAdapter
+import com.ktan.processor.integrations.livedata.LiveDataPropertyAdapter
 import com.ktan.processor.properties.DefaultPropertyAdapter
 import java.io.OutputStream
 
@@ -31,7 +31,7 @@ class KtanProcessor(environment: SymbolProcessorEnvironment) : SymbolProcessor {
 
         private const val OPTIONS_PREFIX = "com.ktan.processor"
 
-        private const val OPTIONS_LIVE_DATA = "$OPTIONS_PREFIX.LIVE_DATA"
+        private const val OPTIONS_INTEGRATIONS = "$OPTIONS_PREFIX.integrations"
     }
 
     private val logger = environment.logger
@@ -62,7 +62,7 @@ class KtanProcessor(environment: SymbolProcessorEnvironment) : SymbolProcessor {
             })
         val extrasKClassVisitor = ExtrasKClassVisitor(
             dependencies,
-            options[OPTIONS_LIVE_DATA]?.equals("true") == true
+            options[OPTIONS_INTEGRATIONS]?.let { OPTIONS_INTEGRATIONS.plus(".$it") }
         )
         val routeKClassVisitor = RouteKClassVisitor(dependencies)
 
@@ -77,7 +77,7 @@ class KtanProcessor(environment: SymbolProcessorEnvironment) : SymbolProcessor {
 
     private inner class ExtrasKClassVisitor(
         val dependencies: Dependencies,
-        val liveDataOption: Boolean
+        val integrationOption: String?
     ) : KSVisitorVoid() {
 
         override fun visitClassDeclaration(
@@ -104,8 +104,14 @@ class KtanProcessor(environment: SymbolProcessorEnvironment) : SymbolProcessor {
             val fileNameGenerated = "${className}Ktan"
             val ktanExtrasClassDeclaration = KtanExtrasClassDeclaration(className, packageName)
             val adapters = listOf(
-                LivePropertyAdapter(liveDataOption, ktanExtrasClassDeclaration),
-                FlowPropertyAdapter(ktanExtrasClassDeclaration),
+                LiveDataPropertyAdapter(
+                    integrationOption,
+                    ktanExtrasClassDeclaration
+                ),
+                FlowPropertyAdapter(
+                    integrationOption,
+                    ktanExtrasClassDeclaration
+                ),
                 DefaultPropertyAdapter(ktanExtrasClassDeclaration)
             )
             logger.info("package $ktanExtrasClassDeclaration", classDeclaration)

@@ -7,11 +7,13 @@ import com.ktan.processor.extensions.isAnnotationPresent
 import com.ktan.processor.properties.DefaultPropertyAdapter
 
 class FlowPropertyAdapter(
+    private val integrationOption: String?,
     classDeclaration: KtanExtrasClassDeclaration
 ) : DefaultPropertyAdapter(classDeclaration) {
 
     override fun isMatch(annotations: Sequence<KSAnnotation>): Boolean {
-        return annotations.isAnnotationPresent(FlowExtra::class)
+        return integrationOption == this.javaClass.packageName ||
+            annotations.isAnnotationPresent(FlowExtra::class)
     }
 
     override fun onInit(name: String) {

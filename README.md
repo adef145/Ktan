@@ -33,8 +33,14 @@ Ktan make your intent / arguments more easier and readable. And most important, 
    }
    
    ksp {
+      // THIS OPTION IS REMOVED
+      // arg("com.ktan.processor.LIVE_DATA", "true")
+
       // put this arg to turn on LiveData for all extra
-      arg("com.ktan.processor.LIVE_DATA", "true")
+      arg("com.ktan.processor.integrations", "livedata")
+      // or
+      // put this arg to turn on Flow for all extra
+      arg("com.ktan.processor.integrations", "flow")
    }
    
    android {
