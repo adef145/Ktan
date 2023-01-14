@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.2
+### Release Highlights
+* Having `Flow` integration for getting extras data.
+* Update ksp option to turn on or off single integration (live data or flow)
+  * Change option from `com.ktan.processor.LIVE_DATA=true/false` into `com.ktan.processor.integrations=livedata/flow`
+
+### Features
+* Annotation `@FlowExtra`. To help processor to generate `StateFlow` data type on `Binding` class. And also can combine with another annotation likes:
+  * Annotation `@Required`. To define non null when receive the data from observe.
+  * Annotation `@Mutable`. To define as `MutableStateFlow` instead of `StateFlow`.
+
+### Enhancement
+* Refactoring Ksp processor, more easier to read and adding more integration.
+
 ## 1.1
 ### Release Highlights
 Having `LiveData` integration for getting extras data.

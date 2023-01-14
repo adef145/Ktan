@@ -8,6 +8,9 @@ import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.widget.doOnTextChanged
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.happyfresh.ktan.livedata.annotations.LiveExtra
 import com.ktan.annotations.Extras
 import com.ktan.annotations.Mutable
@@ -16,7 +19,9 @@ import com.ktan.annotations.Route
 import com.ktan.binding.bindExtras
 import com.ktan.extra.IntExtra
 import com.ktan.extra.StringExtra
+import com.ktan.flow.annotations.FlowExtra
 import com.ktan.parceler.extra.ParcelerExtra
+import kotlinx.coroutines.launch
 
 @Route(
     extras = [ExampleExtras::class]
@@ -59,10 +64,21 @@ open class ExampleActivity : AppCompatActivity(R.layout.activity_example) {
         nameEditText.setText(extrasBinding.store?.name)
         nameEditText.doOnTextChanged { text, _, _, _ ->
             extrasBinding.nameLive.postValue(text?.toString())
+            lifecycleScope.launch {
+                extrasBinding.nameFlow.emit(text?.toString())
+            }
         }
 
         extrasBinding.nameLive.observe(this) {
-            Toast.makeText(this, "$it", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Live: $it", Toast.LENGTH_SHORT).show()
+        }
+        val context = this
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                extrasBinding.nameFlow.collect {
+                    Toast.makeText(context, "Flow: $it", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 
@@ -94,6 +110,10 @@ class ExampleExtras {
     @Mutable
     @LiveExtra
     val nameLive = name
+
+    @Mutable
+    @FlowExtra
+    val nameFlow = name
 }
 
 @Extras

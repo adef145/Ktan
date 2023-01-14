@@ -14,7 +14,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Ktan"
         tools:targetApi="31">
-        <activity android:name="com.ktan.example.ExampleActivityJava"
+        <activity android:name="com.ktan.example.ExampleActivity"
             android:exported="true">
             <intent-filter>
                 <category android:name="android.intent.category.LAUNCHER" />

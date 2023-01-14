@@ -1,17 +1,28 @@
 package com.ktan.processor
 
-import com.google.devtools.ksp.*
+import com.google.devtools.ksp.getAllSuperTypes
+import com.google.devtools.ksp.getDeclaredProperties
+import com.google.devtools.ksp.isAbstract
+import com.google.devtools.ksp.isOpen
 import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
-import com.google.devtools.ksp.symbol.*
-import com.google.devtools.ksp.visitor.KSValidateVisitor
-import com.happyfresh.ktan.livedata.annotations.LiveExtra
+import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSType
+import com.google.devtools.ksp.symbol.KSVisitorVoid
+import com.google.devtools.ksp.validate
 import com.ktan.annotations.Extras
-import com.ktan.annotations.Mutable
-import com.ktan.annotations.Required
 import com.ktan.annotations.Route
+import com.ktan.processor.extensions.getAnnotations
+import com.ktan.processor.extensions.isActivityPresent
+import com.ktan.processor.extensions.isFragmentPresent
+import com.ktan.processor.extensions.isMutablePresent
+import com.ktan.processor.extensions.isRequiredPresent
+import com.ktan.processor.integrations.flow.FlowPropertyAdapter
+import com.ktan.processor.integrations.livedata.LiveDataPropertyAdapter
+import com.ktan.processor.properties.DefaultPropertyAdapter
 import java.io.OutputStream
 
 class KtanProcessor(environment: SymbolProcessorEnvironment) : SymbolProcessor {
@@ -20,7 +31,7 @@ class KtanProcessor(environment: SymbolProcessorEnvironment) : SymbolProcessor {
 
         private const val OPTIONS_PREFIX = "com.ktan.processor"
 
-        private const val OPTIONS_LIVE_DATA = "$OPTIONS_PREFIX.LIVE_DATA"
+        private const val OPTIONS_INTEGRATIONS = "$OPTIONS_PREFIX.integrations"
     }
 
     private val logger = environment.logger
@@ -49,177 +60,99 @@ class KtanProcessor(environment: SymbolProcessorEnvironment) : SymbolProcessor {
                     KtanKSValidateVisitor(), null
                 )
             })
+        val extrasKClassVisitor = ExtrasKClassVisitor(
+            dependencies,
+            options[OPTIONS_INTEGRATIONS]?.let { OPTIONS_INTEGRATIONS.plus(".$it") }
+        )
+        val routeKClassVisitor = RouteKClassVisitor(dependencies)
 
-        extrasSymbolsToProcess
-            .forEach {
-                it.accept(
-                    ExtrasKClassVisitor(
-                        dependencies,
-                        options[OPTIONS_LIVE_DATA]?.equals("true") == true
-                    ), Unit
-                )
-            }
+        extrasSymbolsToProcess.forEach {
+            it.accept(extrasKClassVisitor, Unit)
+        }
         routeSymbolsToProcess
-            .forEach { it.accept(RouteKClassVisitor(dependencies), Unit) }
+            .forEach { it.accept(routeKClassVisitor, Unit) }
 
         return unableToProcess.toList()
     }
 
     private inner class ExtrasKClassVisitor(
         val dependencies: Dependencies,
-        val liveDataOption: Boolean
+        val integrationOption: String?
     ) : KSVisitorVoid() {
 
         override fun visitClassDeclaration(
             classDeclaration:
             KSClassDeclaration, data: Unit
         ) {
+            // Validate abstract class
             if (classDeclaration.isAbstract()) {
                 logger.error(
                     "||Class Annotated with Extras should not abstract", classDeclaration
                 )
             }
 
+            // Validate open class
             if (classDeclaration.isOpen()) {
                 logger.error(
                     "||Class Annotated with Projections should kotlin data class", classDeclaration
                 )
             }
 
+            // region Prerequisite
             val className = classDeclaration.simpleName.getShortName()
             val packageName = classDeclaration.packageName.asString()
-            val classPackage = "$packageName.$className"
-            val properties = classDeclaration.getDeclaredProperties()
-            val bindingProperties = StringBuilder()
-            val routerProperties = StringBuilder()
             val fileNameGenerated = "${className}Ktan"
-            val importDependencies = StringBuilder(
-                """
-                |import android.content.Context
-                |import android.content.Intent
-                |import android.os.Bundle
-                |import com.ktan.extraOf
-                |import com.ktan.requiredExtraOf
-                |import com.ktan.binding.ExtrasBinding
-                |import com.ktan.router.KtanRouter
-                """.trimMargin()
+            val ktanExtrasClassDeclaration = KtanExtrasClassDeclaration(className, packageName)
+            val adapters = listOf(
+                LiveDataPropertyAdapter(
+                    integrationOption,
+                    ktanExtrasClassDeclaration
+                ),
+                FlowPropertyAdapter(
+                    integrationOption,
+                    ktanExtrasClassDeclaration
+                ),
+                DefaultPropertyAdapter(ktanExtrasClassDeclaration)
             )
+            logger.info("package $ktanExtrasClassDeclaration", classDeclaration)
+            // endregion Prerequisite
 
-            logger.info("package $classPackage", classDeclaration)
+            // Looping all declared properties / fields
+            classDeclaration.getDeclaredProperties().filter { it.validate() }.forEach {
+                // Get name of property / field
+                val name = it.simpleName.getShortName()
 
-            var hasImportLiveExtraExt = false
+                logger.info("$name found with type ${it.type}")
 
-            properties.filter { it.validate() }.forEach {
-                var declaringProperty = "val"
-                var delegatedPropertyBinding = "extraOf(extras.${it.simpleName.getShortName()})"
-                var delegatedPropertyRouter = "extraOf(extras.${it.simpleName.getShortName()})"
-                val isMutable = it.annotations.isAnnotationPresent(Mutable::class.java.simpleName)
-                val isRequired = it.annotations.isAnnotationPresent(Required::class.java.simpleName)
-                val isLiveExtra =
-                    liveDataOption || it.annotations.isAnnotationPresent(LiveExtra::class.java.simpleName)
+                // Get adapter base on matching rule
+                val adapter = adapters.first { adapter -> adapter.isMatch(it.annotations) }
 
-                logger.info(
-                    "${it.simpleName.getShortName()} found in $className with type ${it.type}"
-                )
+                // Do init first
+                adapter.onInit(it.simpleName.getShortName())
 
-                if (isLiveExtra && !hasImportLiveExtraExt) {
-                    importDependencies.append(
-                        """
-                        |
-                        |import com.ktan.livedata.liveExtraOf
-                        |import com.ktan.livedata.mutableLiveExtraOf
-                        |import com.ktan.livedata.requiredLiveExtraOf
-                        |import com.ktan.livedata.requiredMutableLiveExtraOf
-                        """.trimMargin()
-                    )
-                    hasImportLiveExtraExt = true
+                // Setup adapter if mutable annotation present
+                if (it.annotations.isMutablePresent()) {
+                    adapter.onMutableIsPresent()
                 }
 
-                if (isLiveExtra) {
-                    delegatedPropertyBinding = "live${
-                        delegatedPropertyBinding.replaceFirstChar { first ->
-                            first.uppercase()
-                        }
-                    }"
+                // Setup adapter if required annotation present
+                if (it.annotations.isRequiredPresent()) {
+                    adapter.onRequiredIsPresent()
                 }
 
-                if (isMutable) {
-                    if (isLiveExtra) {
-                        delegatedPropertyBinding = "mutable${
-                            delegatedPropertyBinding.replaceFirstChar { first ->
-                                first.uppercase()
-                            }
-                        }"
-                    } else {
-                        declaringProperty = "var"
-                    }
-                }
-                if (isRequired) {
-                    delegatedPropertyRouter = "required${
-                        delegatedPropertyRouter.replaceFirstChar { first ->
-                            first.uppercase()
-                        }
-                    }"
-                    delegatedPropertyBinding = "required${
-                        delegatedPropertyBinding.replaceFirstChar { first ->
-                            first.uppercase()
-                        }
-                    }"
-                }
-
-                bindingProperties.append(
-                    """
-                    |$declaringProperty ${it.simpleName.getShortName()} by $delegatedPropertyBinding
-                    |   
-                    """.trimMargin()
-                )
-                routerProperties.append(
-                    """
-                    |var ${it.simpleName.getShortName()} by $delegatedPropertyRouter
-                    |   
-                    """.trimMargin()
-                )
+                // Build adapter
+                adapter.build()
             }
 
+            // Create file
             val outputStream: OutputStream = codeGenerator.createNewFile(
                 dependencies = dependencies,
                 packageName = packageName,
                 fileName = fileNameGenerated
             )
 
-            outputStream.write(
-                """
-                |package $packageName
-                |
-                |$importDependencies
-                |
-                |class ${className}Binding(extras: $className = $className()) : ExtrasBinding() {
-                |
-                |   $bindingProperties
-                |}
-                |
-                |class ${className}Router(block: ${className}Router.() -> Unit) : KtanRouter() {
-                |
-                |   private val extras: $className = $className()
-                |
-                |   $routerProperties
-                |   init {
-                |       block.invoke(this)
-                |   }
-                |
-                |}
-                |
-                |fun Intent.populate${className}(block: ${className}Router.() -> Unit): Intent {
-                |   ${className}Router(block).populate(this)
-                |   return this;
-                |}
-                |
-                |fun Bundle.populate${className}(block: ${className}Router.() -> Unit): Bundle {
-                |   ${className}Router(block).populate(this)
-                |   return this;
-                |}
-                """.trimMargin().toByteArray()
-            )
+            // Write file
+            outputStream.write(ktanExtrasClassDeclaration.build())
 
             logger.info("File $fileNameGenerated generated")
         }
@@ -231,186 +164,59 @@ class KtanProcessor(environment: SymbolProcessorEnvironment) : SymbolProcessor {
             classDeclaration:
             KSClassDeclaration, data: Unit
         ) {
+            // Validate abstract class
             if (classDeclaration.isAbstract()) {
                 logger.error(
                     "||Class Annotated with Extras should not abstract", classDeclaration
                 )
             }
 
+            // region Prerequisites
             val className = classDeclaration.simpleName.getShortName()
             val packageName = classDeclaration.packageName.asString()
-            val classPackage = "$packageName.$className"
             val routeAnnotation =
-                classDeclaration.annotations.getAnnotations(Route::class.java.simpleName)
+                classDeclaration.annotations.getAnnotations(Route::class) ?: return
             val fileNameGenerated = "${className}Route"
-
-            if (routeAnnotation == null) {
-                logger.error(
-                    "||Extras not found in $className"
-                )
-            }
-
-            val routeExtrasAnnotation =
-                routeAnnotation?.arguments?.filter { it.validate() }
-                    ?.first { it.name?.getShortName() == "extras" }
-            val routeExtrasValue = routeExtrasAnnotation?.value as List<KSType>
+            val ktanRouteClassDeclaration = KtanRouteClassDeclaration(
+                className,
+                packageName
+            )
+            val routeExtrasAnnotation = routeAnnotation.arguments.filter { it.validate() }
+                .first { it.name?.getShortName() == "extras" }
+            val routeExtrasValue = routeExtrasAnnotation.value as List<KSType>
+            // endregion Prerequisites
 
             logger.info(
-                "package $classPackage with args $routeExtrasAnnotation=$routeExtrasValue",
+                "package $ktanRouteClassDeclaration with args $routeExtrasAnnotation=$routeExtrasValue",
                 classDeclaration
             )
 
-            val importDependencies = StringBuilder()
-            val functionGenerated = StringBuilder()
-            val blockArgs = StringBuilder()
-            val blockArgsInput = StringBuilder()
-            val populateBlocks = StringBuilder()
-            val funcPrefix = "routeTo"
-
-            routeExtrasValue.forEach { it ->
-                val extrasValueClassName = it.declaration.simpleName.getShortName()
-                val extrasValuePackageName = it.declaration.packageName.asString()
-                val routerClassName = "${extrasValueClassName}Router"
-                val routerClassNameBlock =
-                    "${routerClassName.replaceFirstChar { it.lowercase() }}Block"
-                val funcPopulateName = "populate${extrasValueClassName}"
-
-                importDependencies.append(
-                    """
-                    |import $extrasValuePackageName.$extrasValueClassName
-                    |import $extrasValuePackageName.$routerClassName
-                    |import $extrasValuePackageName.$funcPopulateName
-                    |
-                    """.trimMargin()
-                )
-                blockArgs.append(
-                    """
-                    |
-                    |   ${routerClassNameBlock}: ${routerClassName}.() -> Unit,
-                    """.trimMargin()
-                )
-                blockArgsInput.append(
-                    """
-                    |
-                    |   ${routerClassNameBlock},
-                    """.trimMargin()
-                )
-                populateBlocks.append(
-                    """
-                    |
-                    |       .$funcPopulateName($routerClassNameBlock)
-                    """.trimMargin()
+            // Bind each route extras value
+            routeExtrasValue.forEach {
+                ktanRouteClassDeclaration.bindRouteExtrasValue(
+                    it.declaration.simpleName.getShortName(),
+                    it.declaration.packageName.asString()
                 )
             }
 
-            importDependencies.append(
-                """
-                |import $classPackage
-                |
-                """.trimMargin()
-            )
-
-            if (classDeclaration.getAllSuperTypes().firstOrNull {
-                    it.declaration.simpleName.getShortName() == "AppCompatActivity"
-                } != null) {
-                importDependencies.append(
-                    """
-                    |import android.app.Activity
-                    |import android.content.Context
-                    |import android.content.Intent
-                    |import androidx.fragment.app.Fragment
-                    |
-                    """.trimMargin()
-                )
-                functionGenerated.append(
-                    """
-                    |fun $funcPrefix$className(
-                    |   context: Context,$blockArgs
-                    |): Intent {
-                    |   return Intent(context, $className::class.java)$populateBlocks
-                    |}
-                    |
-                    |fun Activity.$funcPrefix$className($blockArgs
-                    |): Intent = $funcPrefix$className(
-                    |   this,$blockArgsInput
-                    |)
-                    |
-                    |fun Fragment.$funcPrefix$className($blockArgs
-                    |): Intent? = context?.let { $funcPrefix$className( 
-                    |   it,$blockArgsInput
-                    |)} 
-                    |
-                    """.trimMargin()
-                )
-            } else if (classDeclaration.getAllSuperTypes().firstOrNull {
-                    it.declaration.simpleName.getShortName() == "Fragment"
-                } != null) {
-                importDependencies.append(
-                    """
-                    |import android.content.Context
-                    |import android.os.Bundle
-                    |import androidx.fragment.app.Fragment
-                    |
-                    """.trimMargin()
-                )
-                functionGenerated.append(
-                    """
-                    |fun $funcPrefix$className($blockArgs
-                    |): $className {
-                    |   return ${className}().apply {
-                    |       arguments = Bundle()$populateBlocks
-                    |   }
-                    |}
-                    |
-                    """.trimMargin()
-                )
+            // Setup when parent is Activity / Fragment
+            if (classDeclaration.getAllSuperTypes().isActivityPresent()) {
+                ktanRouteClassDeclaration.onActivityIsParent()
+            } else if (classDeclaration.getAllSuperTypes().isFragmentPresent()) {
+                ktanRouteClassDeclaration.onFragmentIsParent()
             }
 
+            // Create file
             val outputStream: OutputStream = codeGenerator.createNewFile(
                 dependencies = dependencies,
                 packageName = packageName,
                 fileName = fileNameGenerated
             )
 
-            outputStream.write(
-                """
-                |package $packageName
-                |
-                |$importDependencies
-                |$functionGenerated
-                """.trimMargin().toByteArray()
-            )
+            // Write file
+            outputStream.write(ktanRouteClassDeclaration.build())
 
             logger.info("File $fileNameGenerated generated")
         }
-    }
-}
-
-fun Sequence<KSAnnotation>.getAnnotations(name: String): KSAnnotation? = firstOrNull {
-    it.shortName.getShortName() == name
-}
-
-fun Sequence<KSAnnotation>.isAnnotationPresent(name: String): Boolean = getAnnotations(name) != null
-
-fun KSValueParameter.isNotKotlinPrimitive(): Boolean {
-
-    return when (type.element?.toString()) {
-        "String", "Int", "Short", "Number", "Boolean", "Byte", "Char", "Float", "Double", "Long", "Unit", "Any" -> false
-        else -> true
-    }
-}
-
-fun KSValueParameter.getPrimitiveTypeName(): String {
-
-    return type.element?.toString() ?: throw IllegalAccessException()
-}
-
-class KtanKSValidateVisitor : KSValidateVisitor({ _, _ -> true }) {
-
-    override fun visitTypeReference(
-        typeReference: KSTypeReference,
-        data: KSNode?
-    ): Boolean {
-        return true
     }
 }
