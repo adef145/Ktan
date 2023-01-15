@@ -8,7 +8,7 @@
 
 ### Features
 * Annotation `@FlowExtra`. To help processor to generate `StateFlow` data type on `Binding` class. And also can combine with another annotation likes:
-  * Annotation `@Required`. To define non null when receive the data from observe.
+  * Annotation `@Required`. To define non null when consumer receiving the data.
   * Annotation `@Mutable`. To define as `MutableStateFlow` instead of `StateFlow`.
 
 ### Enhancement
@@ -20,7 +20,7 @@ Having `LiveData` integration for getting extras data.
 
 ### Features
 * Annotation `@LiveExtra`. To help processor to generate `LiveData` data type on `Binding` class. And also can combine with another annotation likes:
-  * Annotation `@Required`. To define non null when receive the data from observe.
+  * Annotation `@Required`. To define non null when observer receiving the data.
   * Annotation `@Mutable`. To define as `MutableLiveData` instead of `LiveData`.
 
 ## 1.0
