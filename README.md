@@ -126,7 +126,7 @@ Ktan make your intent / arguments more easier and readable. And most important, 
 
         // All flow will be map to StateFlow or MutableStateFlow
         @Mutable // to define MutableStateFlow instead of StateFlow
-        @Required // to define this extra is required and non null when observe
+        @Required // to define this extra is required and non null when consume
         @FlowExtra // to define this extra as StateFlow when Binding 
         val nameFlow = StringExtra("name_flow_extra")
    }  
